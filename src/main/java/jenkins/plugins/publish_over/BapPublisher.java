@@ -23,6 +23,8 @@
  */
 package jenkins.plugins.publish_over;
 
+import hudson.model.AbstractBuild;
+import hudson.util.VariableResolver;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;
@@ -135,7 +137,7 @@ public class BapPublisher<TRANSFER extends BPTransfer> implements Serializable {
         buildInfo.println(Messages.console_transferredXFiles(countString));
     }
 
-    public void setEffectiveEnvironmentInBuildInfo(final BPBuildInfo buildInfo) {
+    public void setEffectiveEnvironmentInBuildInfo(AbstractBuild<?, ?> build, final BPBuildInfo buildInfo) {
         buildInfo.setVerbose(verbose);
         final BPBuildEnv current = buildInfo.getCurrentBuildEnv();
         final BPBuildEnv target = buildInfo.getTargetBuildEnv();
@@ -149,6 +151,11 @@ public class BapPublisher<TRANSFER extends BPTransfer> implements Serializable {
             final TreeMap<String, String> effectiveEnvVars = current.getEnvVarsWithPrefix(BPBuildInfo.PROMOTION_ENV_VARS_PREFIX);
             effectiveEnvVars.putAll(target.getEnvVars());
             buildInfo.setEnvVars(effectiveEnvVars);
+        }
+        if (configName != null && configName.startsWith("${") && configName.endsWith("}")) {
+            final VariableResolver<String> variableResolver = build.getBuildVariableResolver();
+            String resolvedConfigName = variableResolver.resolve(configName.substring(2, configName.length() - 1));
+            configName = resolvedConfigName;
         }
     }
 

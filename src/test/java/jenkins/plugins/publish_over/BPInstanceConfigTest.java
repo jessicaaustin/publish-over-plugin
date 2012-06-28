@@ -24,6 +24,7 @@
 
 package jenkins.plugins.publish_over;
 
+import hudson.model.AbstractBuild;
 import hudson.model.Result;
 import jenkins.plugins.publish_over.helper.BPBuildInfoFactory;
 import jenkins.plugins.publish_over.helper.BPHostConfigurationFactory;
@@ -65,6 +66,7 @@ public class BPInstanceConfigTest {
         CALLABLE_PUBLISHER_LOGGER.setLevel(publisherOriginalLogLevel);
     }
 
+    private final AbstractBuild build = Mockito.mock(AbstractBuild.class);
     private final BPBuildInfo buildInfo = new BPBuildInfoFactory().createEmpty();
     private final IMocksControl mockControl = EasyMock.createStrictControl();
     private final BPHostConfigurationAccess mockHostConfigurationAccess = Mockito.mock(BPHostConfigurationAccess.class);
@@ -114,7 +116,7 @@ public class BPInstanceConfigTest {
 
     @Test public void testPerformReturnsUnstableWhenNoHostConfigFound() throws Exception {
         final BapPublisher mockPublisher = createAndAddMockPublisher(null);
-        mockPublisher.setEffectiveEnvironmentInBuildInfo((BPBuildInfo) EasyMock.anyObject());
+        mockPublisher.setEffectiveEnvironmentInBuildInfo((AbstractBuild) EasyMock.anyObject(), (BPBuildInfo) EasyMock.anyObject());
         EasyMock.expect(mockPublisher.getConfigName()).andReturn(hostConfiguration.getName());
 
         Mockito.reset(mockHostConfigurationAccess);
@@ -142,7 +144,7 @@ public class BPInstanceConfigTest {
     private BapPublisher createAndAddMockPublisher(final String hostConfigurationName) {
         final BapPublisher mockPublisher = mockControl.createMock(BapPublisher.class);
         if (hostConfigurationName != null) {
-            mockPublisher.setEffectiveEnvironmentInBuildInfo((BPBuildInfo) EasyMock.anyObject());
+            mockPublisher.setEffectiveEnvironmentInBuildInfo((AbstractBuild) EasyMock.anyObject(), (BPBuildInfo) EasyMock.anyObject());
             EasyMock.expect(mockPublisher.getConfigName()).andReturn(hostConfigurationName);
         }
         publishers.add(mockPublisher);
@@ -151,7 +153,7 @@ public class BPInstanceConfigTest {
 
     private void assertResult(final Result expectedResult, final BPInstanceConfig instanceConfig) {
         mockControl.replay();
-        assertEquals(expectedResult, instanceConfig.perform(buildInfo));
+        assertEquals(expectedResult, instanceConfig.perform(build, buildInfo));
         mockControl.verify();
     }
 
@@ -244,7 +246,7 @@ public class BPInstanceConfigTest {
 
     private BapPublisher createLabeledPublisher(final String label, final boolean expectPerform) throws Exception {
         final BapPublisher mockPublisher = mockControl.createMock(BapPublisher.class);
-        mockPublisher.setEffectiveEnvironmentInBuildInfo((BPBuildInfo) EasyMock.anyObject());
+        mockPublisher.setEffectiveEnvironmentInBuildInfo((AbstractBuild) EasyMock.anyObject(), (BPBuildInfo) EasyMock.anyObject());
         expect(mockPublisher.getLabel()).andReturn(new PublisherLabel(label)).anyTimes();
         EasyMock.expect(mockPublisher.getConfigName()).andReturn(hostConfiguration.getName()).anyTimes();
         if (expectPerform) {

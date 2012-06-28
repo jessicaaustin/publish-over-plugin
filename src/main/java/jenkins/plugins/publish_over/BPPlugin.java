@@ -108,7 +108,7 @@ public abstract class BPPlugin<PUBLISHER extends BapPublisher, CLIENT extends BP
         final BPBuildInfo buildInfo = new BPBuildInfo(listener, consolePrefix, Hudson.getInstance().getRootPath(),
                                                       currentBuildEnv, targetBuildEnv);
         fixup(build, buildInfo);
-        final Result result = delegate.perform(buildInfo);
+        final Result result = delegate.perform(build, buildInfo);
 
         if (build.getResult() == null)
             build.setResult(result);

@@ -25,6 +25,9 @@
 package jenkins.plugins.publish_over;
 
 import hudson.FilePath;
+import hudson.model.AbstractBuild;
+import hudson.model.Build;
+import hudson.util.VariableResolver;
 import jenkins.plugins.publish_over.helper.BPBuildInfoFactory;
 import jenkins.plugins.publish_over.helper.BPHostConfigurationFactory;
 import org.easymock.classextension.EasyMock;
@@ -32,10 +35,14 @@ import org.easymock.classextension.IMocksControl;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -47,6 +54,11 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.when;
 
 @SuppressWarnings({ "PMD.SignatureDeclareThrowsException", "PMD.TooManyMethods", "PMD.LooseCoupling" })
 public class BapPublisherTest {
@@ -65,6 +77,7 @@ public class BapPublisherTest {
         PUBLISHER_LOGGER.setLevel(originalLogLevel);
     }
 
+    private final AbstractBuild build = Mockito.mock(AbstractBuild.class);
     private final BPBuildInfo buildInfo = new BPBuildInfoFactory().createEmpty();
     private final IMocksControl mockControl = EasyMock.createStrictControl();
     private final BPClient mockClient = mockControl.createMock(BPClient.class);
@@ -120,17 +133,17 @@ public class BapPublisherTest {
 
     @Test public void testVerbositySetInBuildInfo() throws Exception {
         final BapPublisher publisher = createPublisher(null, false, null);
-        publisher.setEffectiveEnvironmentInBuildInfo(buildInfo);
+        publisher.setEffectiveEnvironmentInBuildInfo(build, buildInfo);
         assertFalse(buildInfo.isVerbose());
         publisher.setVerbose(true);
-        publisher.setEffectiveEnvironmentInBuildInfo(buildInfo);
+        publisher.setEffectiveEnvironmentInBuildInfo(build, buildInfo);
         assertTrue(buildInfo.isVerbose());
     }
 
     @Test public void testEnvironmentUntouchedIfNotPromotion() {
         assertNotSame(buildInfo, buildInfo.getCurrentBuildEnv());
         final BapPublisher publisher = createPublisher(null, false, null);
-        publisher.setEffectiveEnvironmentInBuildInfo(buildInfo);
+        publisher.setEffectiveEnvironmentInBuildInfo(build, buildInfo);
         assertSame(buildInfo.getCurrentBuildEnv().getEnvVars(), buildInfo.getEnvVars());
         assertSame(buildInfo.getCurrentBuildEnv().getBaseDirectory(), buildInfo.getBaseDirectory());
         assertSame(buildInfo.getCurrentBuildEnv().getBuildTime(), buildInfo.getBuildTime());
@@ -146,7 +159,7 @@ public class BapPublisherTest {
         buildInfo.getCurrentBuildEnv().getEnvVars().put(envVarName, promoJobName);
         assertNotSame(buildInfo, target);
         final BapPublisher publisher = createPublisher(null, false, null);
-        publisher.setEffectiveEnvironmentInBuildInfo(buildInfo);
+        publisher.setEffectiveEnvironmentInBuildInfo(build, buildInfo);
         assertSame(buildInfo.getTargetBuildEnv().getBaseDirectory(), buildInfo.getBaseDirectory());
         assertSame(buildInfo.getTargetBuildEnv().getBuildTime(), buildInfo.getBuildTime());
         assertEquals(buildInfo.getEnvVars().get(envVarName), targetJobName);
@@ -163,7 +176,7 @@ public class BapPublisherTest {
         buildInfo.getCurrentBuildEnv().getEnvVars().put(envVarName, promoJobName);
         assertNotSame(buildInfo, target);
         final BapPublisher publisher = createPublisher(null, false, null, true, false);
-        publisher.setEffectiveEnvironmentInBuildInfo(buildInfo);
+        publisher.setEffectiveEnvironmentInBuildInfo(build, buildInfo);
         assertSame(buildInfo.getCurrentBuildEnv().getBaseDirectory(), buildInfo.getBaseDirectory());
         assertSame(buildInfo.getTargetBuildEnv().getBuildTime(), buildInfo.getBuildTime());
         assertEquals(buildInfo.getEnvVars().get(envVarName), targetJobName);
@@ -180,11 +193,32 @@ public class BapPublisherTest {
         buildInfo.getCurrentBuildEnv().getEnvVars().put(envVarName, promoJobName);
         assertNotSame(buildInfo, target);
         final BapPublisher publisher = createPublisher(null, false, null, false, true);
-        publisher.setEffectiveEnvironmentInBuildInfo(buildInfo);
+        publisher.setEffectiveEnvironmentInBuildInfo(build, buildInfo);
         assertSame(buildInfo.getTargetBuildEnv().getBaseDirectory(), buildInfo.getBaseDirectory());
         assertSame(buildInfo.getCurrentBuildEnv().getBuildTime(), buildInfo.getBuildTime());
         assertEquals(buildInfo.getEnvVars().get(envVarName), targetJobName);
         assertEquals(buildInfo.getEnvVars().get(BPBuildInfo.PROMOTION_ENV_VARS_PREFIX + envVarName), promoJobName);
+    }
+
+    @Test public void testEnvironmentResolvesConfigNameBasedOnBuildVariables() {
+        HashMap buildVariables = new HashMap();
+        buildVariables.put("ENVIRONMENT", "qa1");
+        when(build.getBuildVariables()).thenReturn(buildVariables);
+
+        final BapPublisher publisher = createPublisher("${ENVIRONMENT}", false, null, false, true);
+        publisher.setEffectiveEnvironmentInBuildInfo(build, buildInfo);
+
+        assertEquals("qa1", publisher.getConfigName());
+    }
+
+    @Test public void testEnvironmentShouldNotResolveVariablesBasedOnEnvironmentIfNotParameterized() {
+        when(build.getBuildVariables()).thenReturn(Collections.EMPTY_MAP);
+
+        final BapPublisher publisher = createPublisher("qa1", false, null, false, true);
+        publisher.setEffectiveEnvironmentInBuildInfo(build, buildInfo);
+
+        assertEquals("qa1", publisher.getConfigName());
+        Mockito.verify(build, never()).getBuildVariableResolver();
     }
 
     @Test public void testRetry() throws Exception {

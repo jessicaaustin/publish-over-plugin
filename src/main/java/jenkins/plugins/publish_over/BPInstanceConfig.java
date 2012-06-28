@@ -24,6 +24,7 @@
 
 package jenkins.plugins.publish_over;
 
+import hudson.model.AbstractBuild;
 import hudson.model.Result;
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;
@@ -114,7 +115,7 @@ public class BPInstanceConfig<PUBLISHER extends BapPublisher> implements Seriali
         fixMasterNodeNameInEnv(buildInfo.getTargetBuildEnv());
     }
 
-    public final Result perform(final BPBuildInfo buildInfo) {
+    public final Result perform(AbstractBuild<?, ?> build, final BPBuildInfo buildInfo) {
         Result toReturn = Result.SUCCESS;
         final Result onError = failOnError ? Result.FAILURE : Result.UNSTABLE;
         if (masterNodeName != null) fixMasterNodeName(buildInfo);
@@ -127,7 +128,7 @@ public class BPInstanceConfig<PUBLISHER extends BapPublisher> implements Seriali
             return onError;
         }
         for (PUBLISHER publisher : publishers) {
-            publisher.setEffectiveEnvironmentInBuildInfo(buildInfo);
+            publisher.setEffectiveEnvironmentInBuildInfo(build, buildInfo);
             if (!selector.selected(publisher)) continue;
             try {
                 final BPHostConfiguration hostConfig = getConfiguration(publisher.getConfigName());
